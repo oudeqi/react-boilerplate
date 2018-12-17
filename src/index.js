@@ -1,9 +1,10 @@
 import React from 'react'
 import ReactDOM from 'react-dom'
 import App from './App'
+import Context from './components/Context.demo'
 
 import { createStore } from './my-libs/redux'
-import { myReducer, add } from './redux/index'
+import { myReducer, add, div } from './redux/index'
 
 // test
 const store = createStore(myReducer)
@@ -17,6 +18,9 @@ store.dispatch(add())
 
 
 ReactDOM.render(
-  <App />,
+  <div>
+    <App />
+    <Context></Context>
+  </div>,
   document.getElementById('app')
 )
