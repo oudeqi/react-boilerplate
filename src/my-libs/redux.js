@@ -1,5 +1,8 @@
-// redux
-export function createStore (redecer) {
+export function createStore (redecer, enhancer) {
+  // 增强器
+  if (enhancer) {
+    return enhancer(createStore)(redecer)
+  }
   let currState = undefined
   const listeners = []
   const getState = function () {
@@ -11,6 +14,7 @@ export function createStore (redecer) {
   const dispatch = function (action) {
     currState = redecer(currState, action)
     listeners.forEach((fn) => { fn() })
+    return action
   }
   dispatch({type: '@@__@@'})
   return { getState, subscribe, dispatch }
@@ -18,88 +22,53 @@ export function createStore (redecer) {
 
 // { add, remove, addAsync }
 // add(参数) 变成 dispatch(add(参数))
-export function bindActionCreators (creators, dispatch) {
-  const bound = {}
-  Object.keys(creators).forEach((v) => {
-    const creator = creators[v]
-    bound[v] = (...args) => dispatch(creator(...args))
-  })
-  return bound
+// export function bindActionCreators (creators, dispatch) {
+//   const bound = {}
+//   Object.keys(creators).forEach((v) => {
+//     const creator = creators[v]
+//     bound[v] = (...args) => dispatch(creator(...args))
+//   })
+//   return bound
+// }
+
+function bindActionCreator(creator, dispatch){
+	return (...args) => dispatch(creator(...args))
+}
+export function bindActionCreators(creators,dispatch){
+	return Object.keys(creators).reduce((ret,item)=>{
+		ret[item] = bindActionCreator(creators[item],dispatch)
+		return ret
+	}, {})
 }
 
 
-// react-redux
-import React from 'react'
-import PropTypes from 'prop-types'
-
-// 接受一个组件，吧state里的数据放进去，返回一个组件
-// 数据变化时，通知组件
-export function connect2 (mapStateToProps, mapDispatchToProps) {
-  return function (WarpComponent) {
-    return class ConnectComponent extends React.Component {
-      // 。。。
+// enhancer
+export function applyMiddleware (...middlewares) {
+  return createStore => (...args) => {
+    const store = createStore(...args)
+    const middApi = {
+      getState: store.getState,
+      dispatch: (...args) => store.dispatch(...args)
     }
-  }
-}
-
-export const connect = (mapStateToProps=s=>s, mapDispatchToProps={}) => (WarpComponent) => {
-  return class ConnectComponent extends React.Component {
-    constructor () {
-      super()
-      this.state = {
-        props: {}
-        // TODO props: this.props
-      }
-    }
-    static contextTypes = {
-      store: PropTypes.object
-    }
-    componentDidMount () {
-      const store = this.context.store
-      store.subscribe(() => this.update())
-      this.update()
-    }
-    update () {
-      // 获取mapStateToProps、mapDispatchToProps 放入this.state.props
-      const store = this.context.store
-      const state = mapStateToProps(store.getState())
-      /**
-       * function add () {
-       *  return { type: ADD }
-       * } 
-       * 方法不能直接使用，因为需要dispatch
-       * 直接执行add，没有意义；store.dispatch(add()) 才有意义。
-       * 即，将add装饰成：add = () => store.dispatch(add())
-       * */ 
-      const dispatch = bindActionCreators(mapDispatchToProps, store.dispatch)
-      this.setState({
-        props: {
-          ...this.state.props,
-          ... state,
-          ...dispatch
-        }
-      })
-    }
-    render () {
-      <WarpComponent {...this.state.props}></WarpComponent>
-    }
-  }
-}
-
-export class Provide extends React.Component {
-  constructor () {
-    super()
-    this.store = this.props.store
-  }
-  static childContextTypes = {
-    store: PropTypes.object
-  }
-  getChildContext () {
+    // 支持多个middleware
+    const middlewareChain = middlewares.map(middleware => middleware(middApi))
+    const dispatch = compose(...middlewareChain)(store.dispatch)
+    // const dispatch = middleware(middApi)(store.dispatch) // 支持单个middleware
     return {
-      store: this.store
+      ...store,
+      dispatch
     }
   }
-  render () {
-    return this.props.children
-  }
-} 
+}
+
+// compose(fn1, fn2, fn3)
+// fn1(fn2(fn3))
+export function compose (...funcs) {
+  if (funcs.length === 0) {
+		return arg => arg
+	}
+	if (funcs.length === 1) {
+		return funcs[0]
+	}
+  return funcs.reduce((ret, item) => (...args) => ret(item(...args)))
+}

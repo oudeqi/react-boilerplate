@@ -22,4 +22,14 @@ export function div () {
     num: 1
   }
 }
+export function addAsync () {
+  return dispatch => {
+    setTimeout(() => {
+      dispatch(add())
+    }, 2000)
+  }
+}
 
+export function addTwice(){
+  return [add(), addAsync()]
+}
